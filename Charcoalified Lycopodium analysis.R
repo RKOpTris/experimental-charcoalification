@@ -7,8 +7,7 @@ library(Ternary)
 ######### MAIN TEXT
 ###################
 
-### Need to delete this
-setwd("/Users/mukappa/Documents/Teratologies/Charred lycopodium")
+# Load helper functions, assumes script is in same directory as data
 source("Charcoalified Lycopodium analysis FUNCTIONS.R", local = T)
 
 # Load in data
@@ -18,6 +17,8 @@ pdi <- read.csv("Charcoalified Lycopodium PDI.csv")
 lyc <- read.csv("Charcoalified Lycopodium SIZE.csv")
 wl <- read.csv("Charcoalified Lycopodium MASS LOSS.csv")
 rouxhet <- read.csv("Charcoalified Lycopodium Rouxhet chemical data TABLE.csv")
+PDIcal <- read.csv("Charcoalified Lycopodium CALIBRATION.csv")
+
 
 # Remove ambient air CO2 spikes from 2410-2200 cm-1
 sp <- remove.co2.signal(sp)
@@ -378,7 +379,6 @@ lycPDI %>%
 robust_model_6a <- robustbase::lmrob(Length_Mean ~ Temperature, data = lycPDI)
 summary(robust_model_6a)
 
-
 ### Estimate of N required in order to obtain more accurate mean
 meanSD <- lyc %>% 
   group_by(Temperature) %>% 
@@ -442,13 +442,13 @@ plot(Mass_Loss ~ Temp, wl_long_sig,
      ylab = "Mass loss (%)",
      axes = FALSE)
 curve(coef(logistic_fit)["a"] / (1 + exp(-coef(logistic_fit)["b"] * (x - coef(logistic_fit)["c"]))),
-      add = TRUE, lwd = 2, lty = 2)
+      add = TRUE, lwd = 2, lty = 1)
 points(Mass_Loss ~ Temp, wl_long_sig[wl_long_sig$Study == "This", ], pch = 16, cex = 2)
 points(Mass_Loss ~ Temp, wl_long_sig[wl_long_sig$Study == "Rouxhet", ], cex = 2, lwd = 3)
 legend("bottomright", 
        pch = c(16, 1, NA, NA, 4, NA), 
        col = c("black", "black", "black", NA, "darkred", "darkred"), 
-       lty = c(NA, NA, 2, NA, NA, 2), 
+       lty = c(NA, NA, 1, NA, NA, 2), 
        legend = c("Lycopodium, this study",
                   "Lycopodium sporopollenin (Rouxhet et al., 1979)",
                   "Logistic model of both mass loss datasets",
@@ -457,7 +457,7 @@ legend("bottomright",
                   "Logistic model of PDI data"), cex = 1.1, lwd = 2)
 internal_axis_ticks(1:2, 1:2, cex.axis = 1.5)
 par(new = T)
-plot(PDI ~ Temp, PDI_data, axes = FALSE, xlab = "", ylab = "", type = "n")
+plot(PDI ~ Temp, PDI_data, axes = FALSE, xlab = "", ylab = "", type = "n", ylim = c(0, max(PDI_data$PDI)))
 curve(coef(logistic_fit_PDI)["a"] / (1 + exp(-coef(logistic_fit_PDI)["b"] * (x - coef(logistic_fit_PDI)["c"]))),
       add = TRUE, lwd = 2, lty = 2, col = "darkred")
 points(PDI ~ Temp, PDI_data, col = "darkred", cex = 2, pch = 4, lwd = 3)
@@ -475,6 +475,31 @@ summary(logistic_fit_PDI)
 #######################
 
 ######## SUPPLEMENTARY FIGURE S1
+PDIcal <- read.csv("~/Documents/Teratologies/Charred Lycopodium/RGB Calibration for Geoff Clayton.csv")
+PDIcal <- PDIcal[complete.cases(PDIcal), ]
+PDIcal$Setup <- paste0(PDIcal$Camera, "_", PDIcal$Filter)
+PDIcal <- PDIcal %>% select(Camera, Filter, PDI) %>% tidyr::spread("Camera", "PDI")
+PDIcal %>% 
+  ggplot(aes(`Nikon 1`, Leica)) + 
+  stat_smooth(method = "lm", col = smoothCol, fill = smoothCol, alpha = 0.2) +
+  geom_point(size = 2, col = pointCol) +
+  scale_x_continuous(limits = c(0, 100), breaks = seq(0, 100, 20)) +
+  scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, 20)) +
+  theme_bw() +
+  theme(axis.text = element_text(size = 15),
+        axis.title = element_text(size = 25),
+        strip.text = element_text(size = 20),
+        title = element_text(size = 25)) +
+  labs(y = paste0("PDI (%) Leica"),
+       x = paste0("PDI (%) Nikon 1")) +
+  annotate("text", x = 20, y = 98, label = "y = 1.82x - 57.9", size = 5) +
+  annotate("text", x = 20, y = 94, label = expression(paste("R"^"2"*" = 0.981")), size = 5)
+
+# Regression model
+summary(lm(`Nikon 1` ~ Leica, PDIcal))
+
+
+######## SUPPLEMENTARY FIGURE S2
 sp_cor_mat <- sp_cor_pearson <- sp_means %>% 
   select(-c(sd, upper, lower)) %>% 
   tidyr::spread("wavenumber", "mean") %>% 
@@ -504,7 +529,7 @@ mtext(3, -2, at = 7:10, text = "O", cex = 4)
 mtext(3, -1.5, at = 11, text = "III", cex = 2)
 mtext(3, -2, at = 11, text = "O", cex = 4)
 
-######## SUPPLEMENTARY FIGURE S2
+######## SUPPLEMENTARY FIGURE S3
 lutzkelyco <- read.csv("Lutzke Lycopodium sporopollenin spectrum.csv")
 mylyco <- sp_means %>% filter(sample == "HFT0") %>% ungroup() %>% select(wavenumber, mean) %>% rename("absorbance" = "mean") %>% filter(wavenumber < 3600 & wavenumber > 948)
 
@@ -525,7 +550,7 @@ plot_deriv <- select(sp_means, -c(sd, upper, lower)) %>%
   tidyr::gather("wavenumber", "mean", -sample) %>%
   mutate(wavenumber = strip_non_numbers(wavenumber))
 
-######## SUPPLEMENTARY FIGURE S3
+######## SUPPLEMENTARY FIGURE S4
 oleic <- read.csv("Lutzke oleic acid spectrum.CSV", header = F)
 oleic <- to_absorbance(oleic)
 names(oleic) <- c("wavenumber", "absorbance")
@@ -588,7 +613,7 @@ mtext(2, 1.5, at = inRange(sp_means$mean, 1.025), text = "Relative absorbance", 
 legend("bottomright", lty = 1, lwd = 2, col = overplot_palette[-length(overplot_palette)], legend = publication_labels[-length(overplot_palette)], cex = 0.8)
 
 
-######## SUPPLEMENTARY FIGURE S4 PANE 1
+######## SUPPLEMENTARY FIGURE S5 PANE 1
 plot_all_means(plot_deriv, 3025, 2825, plot_legend = "bottomleft")
 plot_wn_label(3025, 2825, 3006, label = "D", temp = "375")
 plot_wn_label(3025, 2825, 2975, label = "O", temp = "250", arrow_size = 1)
@@ -599,7 +624,7 @@ plot_wn_shift(wn_hi = 3025, wn_lo = 2825, wn_from = 2874, wn_to = 2870, temp_fro
 other_peaks1 <- c(2957, 2925, 2854)
 purrr::walk(other_peaks1, .f = function(x){plot_peak_label(wn_hi = 3025, wn_lo = 2825, wn = x)})
 
-######## SUPPLEMENTARY FIGURE S4 PANE 2
+######## SUPPLEMENTARY FIGURE S5 PANE 2
 plot_all_means(plot_deriv, 1775, 1575, plot_legend = "none")
 plot_wn_label(1775, 1575, 1770, label = "A", temp = "375")
 plot_wn_label(1775, 1575, 1727, label = "D", temp = "275")
@@ -609,7 +634,7 @@ plot_wn_shift(wn_hi = 1775, wn_lo = 1575, wn_from = 1604, wn_to = 1593, temp_fro
 other_peaks2 <- c(1710, 1654, 1635)
 purrr::walk(other_peaks2, .f = function(x){plot_peak_label(wn_hi = 1775, wn_lo = 1575, wn = x)})
 
-######## SUPPLEMENTARY FIGURE S4 PANE 3
+######## SUPPLEMENTARY FIGURE S5 PANE 3
 plot_all_means(plot_deriv, 1600, 1375, plot_legend = "none")
 plot_wn_label(1600, 1375, 1558, label = "A", temp = "275")
 plot_wn_label(1600, 1375, 1541, label = "A", temp = "250", arrow_size = 2)
@@ -620,7 +645,7 @@ plot_wn_shift(wn_hi = 1600, wn_lo = 1375, wn_from = 1517, wn_to = 1514, temp_fro
 other_peaks3 <- c(1490, 1466, 1457, 1436, 1415)
 purrr::walk(other_peaks3, .f = function(x){plot_peak_label(wn_hi = 1600, wn_lo = 1375, wn = x)})
 
-######## SUPPLEMENTARY FIGURE S4 PANE 4
+######## SUPPLEMENTARY FIGURE S5 PANE 4
 plot_all_means(plot_deriv, 1400, 1200, plot_legend = "none")
 plot_wn_shift(wn_hi = 1400, wn_lo = 1200, wn_from = 1350, wn_to = 1342, temp_from = 175, temp_to = 375, bar_space = 12, l2r = F, low_text = "275")
 plot_wn_shift(wn_hi = 1400, wn_lo = 1200, wn_from = 1308, wn_to = 1300, temp_from = 175, temp_to = 375, bar_space = 12, l2r = T, low_text = "275")
@@ -632,7 +657,7 @@ plot_wn_label(1400, 1200, 1248, label = "A", temp = "375")
 other_peaks4 <- c(1379)
 purrr::walk(other_peaks4, .f = function(x){plot_peak_label(wn_hi = 1400, wn_lo = 1200, wn = x)})
 
-######## SUPPLEMENTARY FIGURE S4 PANE 5
+######## SUPPLEMENTARY FIGURE S5 PANE 5
 plot_all_means(plot_deriv, 1200, 950, plot_legend = "none")
 plot_wn_label(1200, 950, 1154, label = "A", temp = "375", arrow_size = 2)
 plot_wn_label(1200, 950, 968, label = "A", temp = "250")
@@ -643,7 +668,7 @@ plot_wn_shift(wn_hi = 1200, wn_lo = 950, wn_from = 996, wn_to = 987, temp_from =
 other_peaks5 <- c(1167, 1141, 1034)
 purrr::walk(other_peaks5, .f = function(x){plot_peak_label(wn_hi = 1200, wn_lo = 950, wn = x)})
 
-######## SUPPLEMENTARY FIGURE S5
+######## SUPPLEMENTARY FIGURE S6
 HCO <- rouxhet %>% select(Temp, WeightLoss, Perc_H, Perc_C, Perc_O) %>% mutate(Perc_Other = 100 - Perc_H - Perc_C - Perc_O)
 HCO %>% 
   tidyr::gather("Element", "Perc", -Temp, -WeightLoss) %>%
@@ -663,7 +688,6 @@ HCO %>%
        y = "Proportion of total mass (%)") +
   scale_y_continuous(breaks = seq(0, 100, 10))
 
-######## SUPPLEMENTARY FIGURE S6
 
 ######## SUPPLEMENTARY FIGURE S7
 TernaryPlot(alab = "Redder \u2192", blab = "\u2190 Greener", clab = "Bluer \u2192",
@@ -696,3 +720,5 @@ AddToTernary(graphics::points, data_points, pch = 21, cex = 2,
                          character(1))
 )
 
+
+##### END OF DOCUMENT
